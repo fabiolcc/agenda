@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda de Compromissos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 20px auto;
+            background-color: white;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        .calendar-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .calendar-header {
+            font-size: 24px;
+            flex-grow: 1;
+            text-align: center;
+        }
+
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            margin-top: 20px;
+        }
+
+        .calendar-day {
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+            transition: background-color 0.3s;
+        }
+
+        .calendar-day:hover {
+            background-color: #e1e1e1;
+        }
+
+        .event-marker {
+            background-color: #33ff57;
+            border-radius: 50%;
+            width: 8px;
+            height: 8px;
+            margin: 0 auto;
+        }
+
+        .event-form {
+            display: flex;
+            flex-direction: column;
+            margin-top: 20px;
+        }
+
+        .event-form input, .event-form select, .event-form button {
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .events {
+            margin-top: 20px;
+        }
+
+        .event {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-left: 5px solid;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .event .event-info {
+            flex-grow: 1;
+        }
+
+        .event .event-time {
+            color: gray;
+        }
+
+        .event .event-delete {
+            cursor: pointer;
+            color: red;
+            font-weight: bold;
+        }
+
+        /* Media Queries para responsividade */
+        @media (max-width: 768px) {
+            .calendar {
+                grid-template-columns: repeat(5, 1fr); /* Reduzir o número de colunas para 5 em telas menores */
+            }
+
+            .calendar-container {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .calendar-header {
+                font-size: 20px;
+            }
+
+            .event-form input,
+            .event-form select,
+            .event-form button {
+                font-size: 14px;
+            }
+
+            .event {
+                font-size: 14px;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .event .event-delete {
+                align-self: flex-end;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 18px;
+            }
+
+            .calendar-day {
+                padding: 8px;
+                font-size: 12px;
+            }
+
+            .event-form input,
+            .event-form select,
+            .event-form button {
+                font-size: 12px;
+            }
+
+            .event {
+                font-size: 12px;
+            }
+
+            button {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Agenda de Compromissos</h1>
+
+    <div class="calendar-container">
+        <button onclick="prevMonth()">Anterior</button>
+        <div class="calendar-header" id="calendar-header">Mês/Ano</div>
+        <button onclick="nextMonth()">Próximo</button>
+    </div>
+
+    <div class="calendar" id="calendar"></div>
+
+    <div class="event-form">
+        <label for="event-date">Selecione o dia do evento</label>
+        <input type="text" id="event-date" placeholder="Selecione um dia" readonly>
+        
+        <label for="event-title">Título do Evento</label>
+        <input type="text" id="event-title" placeholder="Título do compromisso">
+
+        <label for="event-color">Cor do Evento</label>
+        <select id="event-color">
+            <option value="#ff5733">Vermelho</option>
+            <option value="#33ff57">Verde</option>
+            <option value="#3357ff">Azul</option>
+            <option value="#f1c40f">Amarelo</option>
+        </select>
+
+        <label for="event-time">Hora do Evento</label>
+        <input type="time" id="event-time">
+
+        <button onclick="addEvent()">Adicionar Evento</button>
+    </div>
+
+    <div class="events" id="events-list"></div>
+</div>
+
+<script>
+    const currentDate = new Date();
+    let selectedDate = null;
+    let events = JSON.parse(localStorage.getItem('events')) || [];
+
+    function checkNotificationPermission() {
+        if (Notification.permission !== "granted") {
+            Notification.requestPermission().then(permission => {
+                if (permission !== "granted") {
+                    alert("Você precisa permitir notificações para receber alertas!");
+                }
+            });
+        }
+    }
+
+    function sendNotification(event) {
+        if (Notification.permission === "granted") {
+            new Notification(`Lembrete: ${event.title}`, {
+                body: `Seu evento "${event.title}" está agendado para hoje!`,
+                icon: "https://www.example.com/notification-icon.png",
+                tag: event.id
+            });
+        }
+    }
+
+    function scheduleNotification(event) {
+        const eventDate = new Date(event.date);
+        const eventTime = event.time.split(":");
+        eventDate.setHours(eventTime[0], eventTime[1], 0, 0);
+
+        const now = new Date();
+
+        const timeBeforeEvent = 5 * 60 * 1000;
+
+        const timeUntilEvent = eventDate - now - timeBeforeEvent;
+
+        if (timeUntilEvent > 0) {
+            setTimeout(() => {
+                sendNotification(event);
+            }, timeUntilEvent);
+        }
+    }
+
+    function loadCalendar() {
+        const month = currentDate.getMonth();
+        const year = currentDate.getFullYear();
+        const firstDayOfMonth = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const calendar = document.getElementById('calendar');
+        const header = document.getElementById('calendar-header');
+
+        calendar.innerHTML = '';
+        header.textContent = `${currentDate.toLocaleString('default', { month: 'long' })} ${year}`;
+
+        for (let i = 0; i < firstDayOfMonth; i++) {
+            const emptyDay = document.createElement('div');
+            calendar.appendChild(emptyDay);
+        }
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dayElement = document.createElement('div');
+            dayElement.classList.add('calendar-day');
+            dayElement.textContent = day;
+            dayElement.onclick = () => selectDate(day);
+
+            const eventMarker = document.createElement('div');
+            eventMarker.classList.add('event-marker');
+            if (isDateWithEvent(day)) {
+                dayElement.appendChild(eventMarker);
+            }
+
+            calendar.appendChild(dayElement);
+        }
+    }
+
+    function selectDate(day) {
+        selectedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+        document.getElementById('event-date').value = selectedDate.toLocaleDateString();
+    }
+
+    function isDateWithEvent(day) {
+        const dateString = new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toLocaleDateString();
+        return events.some(event => event.date === dateString);
+    }
+
+    function addEvent() {
+        const title = document.getElementById('event-title').value;
+        const date = document.getElementById('event-date').value;
+        const color = document.getElementById('event-color').value;
+        const time = document.getElementById('event-time').value;
+
+        if (title && date && selectedDate && time) {
+            const event = {
+                id: new Date().getTime(),
+                title,
+                date,
+                color,
+                time
+            };
+
+            events.push(event);
+            localStorage.setItem('events', JSON.stringify(events));
+
+            scheduleNotification(event);
+            loadCalendar();
+            displayEvents();
+        }
+    }
+
+    function displayEvents() {
+        const eventsList = document.getElementById('events-list');
+        eventsList.innerHTML = '';
+
+        events.forEach(event => {
+            const eventElement = document.createElement('div');
+            eventElement.classList.add('event');
+            eventElement.style.borderLeftColor = event.color;
+
+            eventElement.innerHTML = `
+                <div class="event-info">
+                    <strong>${event.title}</strong><br>
+                    <span class="event-time">${event.date} às ${event.time}</span>
+                </div>
+                <div class="event-delete" onclick="deleteEvent('${event.id}')">Excluir</div>
+            `;
+
+            eventsList.appendChild(eventElement);
+        });
+    }
+
+    function deleteEvent(id) {
+        events = events.filter(event => event.id !== id);
+        localStorage.setItem('events', JSON.stringify(events));
+        loadCalendar();
+        displayEvents();
+    }
+
+    function prevMonth() {
+        currentDate.setMonth(currentDate.getMonth() - 1);
+        loadCalendar();
+    }
+
+    function nextMonth() {
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        loadCalendar();
+    }
+
+    checkNotificationPermission();
+    loadCalendar();
+    displayEvents();
+</script>
+
+</body>
+</html>
